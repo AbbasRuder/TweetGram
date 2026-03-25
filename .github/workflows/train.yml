@@ -25,4 +25,4 @@ jobs:
               env:
                   APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-              run: node train.js
+              run: npm run train
