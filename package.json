@@ -8,7 +8,7 @@
     "bot": "tsx src/index.ts",
     "train": "tsx src/train.ts",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run typecheck"
   },
   "keywords": [],
   "author": "",

@@ -1,10 +1,11 @@
 export const MAX_TWEETS_PER_FETCH = 30;
 export const MAX_TWEETS_FOR_TELEGRAM = 15;
 
-export const KV_STORE_NAME = 'twitter-bot-brain';
+export const KV_STORE_NAME = 'twitter-bot-brain-v2-final-debug';
 export const FEEDBACK_KEY = 'feedback';
 export const RULES_KEY = 'master-rules';
 export const TELEGRAM_OFFSET_KEY = 'telegram-offset';
+export const ACTIVE_BATCH_KEY = 'active-feedback-batch';
 
 export const MIN_FEEDBACK_THRESHOLD = 15;
 

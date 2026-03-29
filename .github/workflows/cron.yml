@@ -7,6 +7,10 @@ on:
         - cron: '0 8-19 * * *'
     workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
 
+concurrency:
+    group: twitter-telegram-bot
+    cancel-in-progress: false
+
 jobs:
     scrape-and-send:
         runs-on: ubuntu-latest

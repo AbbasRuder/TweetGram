@@ -1,54 +1,54 @@
-# Project Context — Twitter → Telegram Bot (TypeScript)
+# Project Context - Twitter to Telegram Bot
 
 ## What this system does
 
-This project runs two production jobs:
+This project runs two jobs:
 
-1. **Bot Run** (`npm run bot`)
-   - Collects Telegram feedback from inline button clicks.
+1. `npm run bot`
+   - Finalizes feedback replies for the previous Telegram batch.
    - Fetches tweets from Apify using one random topic query.
-   - Filters tweets to keep only:
-     - non-retweets
-     - non-replies
-     - only thread parent / original tweets
-   - Removes local spam.
+   - Filters out retweets, replies, thread children, and spam.
    - Uses Gemini to rank relevance based on learned rules.
-   - Sends top tweets to Telegram with 👍/👎 feedback buttons.
+   - Sends the top tweets to Telegram as one numbered batch.
+   - Sends two `ForceReply` prompts:
+     - liked tweet numbers
+     - disliked tweet numbers
 
-2. **Training Run** (`npm run train`)
-   - Reads full feedback history from Apify KV store.
+2. `npm run train`
+   - Reads the feedback history from Apify KV.
    - Skips training until `MIN_FEEDBACK_THRESHOLD` is reached.
-   - Synthesizes an updated master ruleset via Gemini.
-   - Saves new rules + a dated backup.
+   - Synthesizes a refined ruleset with Gemini.
+   - Saves the latest rules plus a dated backup.
 
 ## High-level architecture
 
-- `src/index.ts` → orchestration only for bot run (readable overview).
-- `src/train.ts` → orchestration only for daily training (readable overview).
-- `src/config/*` → env parsing + constants.
-- `src/lib/*` → reusable infrastructure/helpers (KV, tweet utils, Telegram client).
-- `src/bot/*` → bot-specific logic (feedback ingestion, scoring).
-- `src/train/*` → training-specific logic (rules synthesis prompt logic).
-- `src/types/domain.ts` → shared domain types.
+- `src/index.ts` -> bot orchestration
+- `src/train.ts` -> training orchestration
+- `src/config/*` -> env parsing and constants
+- `src/lib/*` -> shared helpers and infrastructure
+- `src/bot/*` -> feedback ingestion and AI scoring
+- `src/train/*` -> master-rule synthesis logic
+- `src/types/domain.ts` -> shared domain types
 
-## System invariants (must not be broken)
+## System invariants
 
-1. **Tweet selection invariant**
-   - Only main tweets should be sent: no replies, no retweets, no child tweets in a thread.
-   - Enforced by `isMainOrParentTweet` and used in `filterTweets`.
+1. Tweet selection invariant
+   - Only main tweets should be sent: no retweets, replies, or thread children.
 
-2. **Feedback persistence invariant**
-   - Feedback appends to history, does not overwrite.
-   - Duplicate callback events are deduped by `eventId`.
+2. Feedback persistence invariant
+   - Feedback appends to history and is deduped by update and tweet identity.
 
-3. **Offset invariant**
-   - Telegram update offset is persisted and advanced to avoid re-processing old updates.
+3. Batch lifecycle invariant
+   - Only one active feedback batch exists at a time.
+   - A batch is finalized at the start of the next bot run.
 
-4. **Entrypoint readability invariant**
-   - `src/index.ts` and `src/train.ts` must stay thin and easy to skim.
-   - Move complexity into helper/service modules.
+4. Offset invariant
+   - Telegram update offset is persisted only after the current batch state has been saved.
 
-## Existing helper functions (reuse these; do not recreate)
+5. Entrypoint readability invariant
+   - `src/index.ts` and `src/train.ts` stay thin and orchestration-focused.
+
+## Key helpers
 
 ### `src/lib/tweet.ts`
 - `escapeHtml(text)`
@@ -70,10 +70,9 @@ This project runs two production jobs:
 - `saveTextToKv(kvStore, key, value)`
 
 ### `src/lib/telegram.ts`
-- `createTelegramClient(config)` returning:
-  - `sendAggregatedTweets(tweets)`
-  - `getUpdates(offset)`
-  - `answerCallbackQuery(callbackQueryId, rating)`
+- `createTelegramClient`
+  - `sendFeedbackBatch`
+  - `getUpdates`
 
 ### `src/config/env.ts`
 - `getEnv()`
@@ -81,28 +80,31 @@ This project runs two production jobs:
 - `assertTrainingEnv(env)`
 
 ### `src/bot/feedback.ts`
-- `collectFeedback(kvStore, telegramClient)`
-- internal helpers already present in this module (reuse/extend here, do not duplicate elsewhere):
-  - `parseFeedbackCallbackData(callbackData)`
-  - `getTweetSnippetFromMessage(messageText, index)`
-  - `appendFeedbackEntries(kvStore, newEntries)`
+- `collectFeedback`
+- `createActiveFeedbackBatch`
+- `saveActiveFeedbackBatch`
+- `parseNumberList`
+- `isNoneReply`
+- `resolvePromptKind`
+- `finalizeBatchReplies`
 
 ### `src/bot/scoring.ts`
-- `scoreTweetsWithAI(genAI, tweets, masterRules)`
+- `scoreTweetsWithAI`
 
 ### `src/train/synthesizer.ts`
-- `synthesizeMasterRules(genAI, feedbackLog, existingRules)`
-- internal helper:
-  - `formatEntries(entries, label)`
+- `synthesizeMasterRules`
 
-### `src/index.ts` local orchestration helpers
-- `pickRandomQuery()`
-- `fetchTweets(apifyClient, actorId, query)`
-- `filterTweets(rawTweets)`
-- `runBot()`
+## Runbook
 
-### `src/train.ts` orchestration helper
-- `runTraining()`
+- Install deps: `npm install`
+- Manual bot run: `npm run bot`
+- Manual training run: `npm run train`
+- Type-check: `npm run typecheck`
+
+## GitHub Actions
+
+- `.github/workflows/cron.yml` runs `npm run bot`.
+- `.github/workflows/train.yml` runs `npm run train`.
 
 ## Rules for adding/changing code
 
@@ -150,18 +152,6 @@ This project runs two production jobs:
 - **Add a new bot feature**
   - Create a new `src/bot/<feature>.ts` module.
   - Keep `src/index.ts` as orchestration.
-
-## Runbook
-
-- Install deps: `npm install`
-- Bot run (manual): `npm run bot`
-- Training run (manual): `npm run train`
-- Type-check: `npm run typecheck`
-
-## GitHub Actions wiring
-
-- `.github/workflows/cron.yml` runs `npm run bot`.
-- `.github/workflows/train.yml` runs `npm run train`.
 
 ## Notes for future chat instances
 

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import type { TweetRecord } from "../types/domain"
+
 import { getTweetAuthor, getTweetText } from "../lib/tweet"
+import type { TweetRecord } from "../types/domain"
 
 export async function scoreTweetsWithAI(
     genAI: GoogleGenerativeAI,
@@ -42,9 +43,11 @@ export async function scoreTweetsWithAI(
             .sort((a, b) => b.score - a.score)
             .map((score) => score.index)
 
-        const filtered = goodIndices.filter((index) => index >= 0 && index < tweets.length).map((index) => tweets[index])
+        const filtered = goodIndices
+            .filter((index) => index >= 0 && index < tweets.length)
+            .map((index) => tweets[index])
 
-        console.log(`AI scoring: ${tweets.length} tweets → ${filtered.length} passed (score ≥ 6).`)
+        console.log(`AI scoring: ${tweets.length} tweets -> ${filtered.length} passed (score >= 6).`)
         return filtered.length > 0 ? filtered : tweets.slice(0, 5)
     } catch (error: any) {
         console.error("Gemini AI scoring failed, passing all tweets:", error?.message || error)

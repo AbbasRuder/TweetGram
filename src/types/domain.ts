@@ -52,3 +52,35 @@ export interface FeedbackEntry {
 export interface TelegramOffsetState {
     offset: number;
 }
+
+export interface FeedbackBatchTweet {
+    index: number;
+    tweetId: string;
+    tweetSnippet: string;
+}
+
+export interface PromptReplyState {
+    updateId: number;
+    messageId: number;
+    text: string;
+    timestamp: string;
+}
+
+export interface ActiveFeedbackBatch {
+    batchId: string;
+    chatId: string;
+    sentAt: string;
+    aggregateMessageId: number;
+    likePromptMessageId: number;
+    dislikePromptMessageId: number;
+    tweets: FeedbackBatchTweet[];
+    likeReply?: PromptReplyState;
+    dislikeReply?: PromptReplyState;
+}
+
+export interface SentFeedbackBatch {
+    sentAt: string;
+    aggregateMessageId: number;
+    likePromptMessageId: number;
+    dislikePromptMessageId: number;
+}

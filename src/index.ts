@@ -1,14 +1,14 @@
 import { ApifyClient } from "apify-client"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-import { getEnv, assertBotEnv } from "./config/env"
+import { createActiveFeedbackBatch, collectFeedback, saveActiveFeedbackBatch } from "./bot/feedback"
 import { MAX_TWEETS_FOR_TELEGRAM, MAX_TWEETS_PER_FETCH, RULES_KEY, TOPIC_QUERIES } from "./config/constants"
-import type { TweetRecord } from "./types/domain"
+import { assertBotEnv, getEnv } from "./config/env"
 import { getOrCreateKvStore, loadFromKv } from "./lib/kvStore"
 import { createTelegramClient } from "./lib/telegram"
 import { getTweetText, isMainOrParentTweet, isSpam } from "./lib/tweet"
-import { collectFeedback } from "./bot/feedback"
 import { scoreTweetsWithAI } from "./bot/scoring"
+import type { TweetRecord } from "./types/domain"
 
 function pickRandomQuery(): string {
     return TOPIC_QUERIES[Math.floor(Math.random() * TOPIC_QUERIES.length)]
@@ -44,9 +44,9 @@ function filterTweets(rawTweets: TweetRecord[]): TweetRecord[] {
 }
 
 async function runBot(): Promise<void> {
-    console.log("═══════════════════════════════════════════")
-    console.log("  Twitter→Telegram Bot — Starting Run")
-    console.log("═══════════════════════════════════════════")
+    console.log("===========================================")
+    console.log("  Twitter to Telegram Bot - Starting Run")
+    console.log("===========================================")
 
     const env = getEnv()
     assertBotEnv(env)
@@ -59,10 +59,10 @@ async function runBot(): Promise<void> {
     })
     const kvStore = await getOrCreateKvStore(apifyClient)
 
-    await collectFeedback(kvStore, telegramClient)
+    await collectFeedback(kvStore, telegramClient, env.telegramChatId!)
 
     const query = pickRandomQuery()
-    console.log(`🔍 Query: ${query}`)
+    console.log(`Query: ${query}`)
 
     const rawTweets = await fetchTweets(apifyClient, env.actorId, query)
     const cleanTweets = filterTweets(rawTweets)
@@ -76,8 +76,11 @@ async function runBot(): Promise<void> {
     const scoredTweets = await scoreTweetsWithAI(genAI, cleanTweets, masterRules)
     const finalTweets = scoredTweets.slice(0, MAX_TWEETS_FOR_TELEGRAM)
 
-    await telegramClient.sendAggregatedTweets(finalTweets)
-    console.log("✅ Aggregated message sent to Telegram successfully.")
+    const sentBatch = await telegramClient.sendFeedbackBatch(finalTweets)
+    const activeBatch = createActiveFeedbackBatch(env.telegramChatId!, finalTweets, sentBatch)
+    await saveActiveFeedbackBatch(kvStore, activeBatch)
+
+    console.log("Feedback batch sent to Telegram successfully.")
 }
 
 runBot().catch((error) => {

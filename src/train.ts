@@ -1,16 +1,16 @@
 import { ApifyClient } from "apify-client"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-import { assertTrainingEnv, getEnv } from "./config/env"
 import { FEEDBACK_KEY, MIN_FEEDBACK_THRESHOLD, RULES_KEY } from "./config/constants"
-import type { FeedbackEntry } from "./types/domain"
+import { assertTrainingEnv, getEnv } from "./config/env"
 import { getOrCreateKvStore, loadFromKv, saveTextToKv } from "./lib/kvStore"
 import { synthesizeMasterRules } from "./train/synthesizer"
+import type { FeedbackEntry } from "./types/domain"
 
 async function runTraining(): Promise<void> {
-    console.log("═══════════════════════════════════════════")
-    console.log("  🧠 Brain Trainer — Daily Rule Synthesis")
-    console.log("═══════════════════════════════════════════")
+    console.log("===========================================")
+    console.log("  Brain Trainer - Daily Rule Synthesis")
+    console.log("===========================================")
 
     const env = getEnv()
     assertTrainingEnv(env)
@@ -34,18 +34,18 @@ async function runTraining(): Promise<void> {
         console.log("Sending feedback history to LLM for analysis...")
         const newRules = await synthesizeMasterRules(genAI, feedbackLog, existingRules)
 
-        console.log("\n── New Master Rules ──────────────────────")
+        console.log("\nNew master rules:")
         console.log(newRules)
-        console.log("──────────────────────────────────────────\n")
+        console.log("")
 
         await saveTextToKv(kvStore, RULES_KEY, newRules)
-        console.log("✅ Master Rules updated and saved to Apify KV Store.")
+        console.log("Master rules updated and saved to Apify KV Store.")
 
         const backupKey = `rules-backup-${new Date().toISOString().split("T")[0]}`
         await saveTextToKv(kvStore, backupKey, newRules)
-        console.log(`📦 Backup saved as "${backupKey}"`)
+        console.log(`Backup saved as "${backupKey}"`)
     } catch (error: any) {
-        console.error("❌ LLM training failed:", error?.message || error)
+        console.error("LLM training failed:", error?.message || error)
         process.exit(1)
     }
 }
