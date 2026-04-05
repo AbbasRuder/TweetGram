@@ -8,7 +8,7 @@ interface TelegramClientConfig {
     chatId: string;
 }
 
-interface TelegramMessage {
+export interface TelegramMessage {
     message_id: number;
     text?: string;
     date?: number;
@@ -23,7 +23,7 @@ interface TelegramMessage {
     };
 }
 
-interface TelegramUpdate {
+export interface TelegramUpdate {
     update_id: number;
     message?: TelegramMessage;
 }
@@ -33,6 +33,15 @@ export function createTelegramClient(config: TelegramClientConfig) {
         const response = await axios.post(`https://api.telegram.org/bot${config.botToken}/${method}`, data);
         return response.data?.result as T;
     };
+
+    async function sendMessage(chatId: string | number, text: string, options: Record<string, unknown> = {}): Promise<TelegramMessage> {
+        return await callApi<TelegramMessage>('sendMessage', {
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            ...options
+        });
+    }
 
     async function sendFeedbackBatch(tweets: TweetRecord[]): Promise<SentFeedbackBatch> {
         if (!tweets.length) {
@@ -48,7 +57,7 @@ export function createTelegramClient(config: TelegramClientConfig) {
             return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>`;
         });
 
-        const header = `<b>New batch of tweets</b>\n<i>${tweets.length} tweets ready for feedback:</i>`;
+        const header = `<b>New batch of tweets</b>\n<i>${tweets.length} tweets ready:</i>`;
         const message = [header, ...lines].join('\n\n');
         const sentAt = new Date().toISOString();
 
@@ -59,33 +68,9 @@ export function createTelegramClient(config: TelegramClientConfig) {
             disable_web_page_preview: true
         });
 
-        const likePrompt = await callApi<TelegramMessage>('sendMessage', {
-            chat_id: config.chatId,
-            text: "Reply to this message with the tweet numbers you liked.\nExample: 1 4 7\nSend 'none' if none.",
-            reply_to_message_id: aggregateMessage.message_id,
-            reply_markup: {
-                force_reply: true,
-                input_field_placeholder: 'e.g. 1 4 7 or none',
-                selective: true
-            }
-        });
-
-        const dislikePrompt = await callApi<TelegramMessage>('sendMessage', {
-            chat_id: config.chatId,
-            text: "Reply to this message with the tweet numbers you disliked.\nExample: 2 5 9\nSend 'none' if none.",
-            reply_to_message_id: aggregateMessage.message_id,
-            reply_markup: {
-                force_reply: true,
-                input_field_placeholder: 'e.g. 2 5 9 or none',
-                selective: true
-            }
-        });
-
         return {
             sentAt,
             aggregateMessageId: aggregateMessage.message_id,
-            likePromptMessageId: likePrompt.message_id,
-            dislikePromptMessageId: dislikePrompt.message_id
         };
     }
 
@@ -95,6 +80,7 @@ export function createTelegramClient(config: TelegramClientConfig) {
 
     return {
         sendFeedbackBatch,
-        getUpdates
+        getUpdates,
+        sendMessage
     };
 }

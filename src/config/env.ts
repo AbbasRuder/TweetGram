@@ -25,9 +25,3 @@ export function assertBotEnv(env: AppEnv): void {
         throw new Error('Missing required environment variables. Need: APIFY_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY');
     }
 }
-
-export function assertTrainingEnv(env: AppEnv): void {
-    if (!env.apifyToken || !env.geminiApiKey) {
-        throw new Error('Missing required env vars: APIFY_TOKEN, GEMINI_API_KEY');
-    }
-}

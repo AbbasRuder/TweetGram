@@ -6,7 +6,6 @@
   "scripts": {
     "start": "npm run bot",
     "bot": "tsx src/index.ts",
-    "train": "tsx src/train.ts",
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck"
   },

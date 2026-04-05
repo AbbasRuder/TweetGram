@@ -1,7 +1,6 @@
 import { ApifyClient } from "apify-client"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-import { createActiveFeedbackBatch, collectFeedback, saveActiveFeedbackBatch } from "./bot/feedback"
 import { MAX_TWEETS_FOR_TELEGRAM, MAX_TWEETS_PER_FETCH, RULES_KEY, TOPIC_QUERIES } from "./config/constants"
 import { assertBotEnv, getEnv } from "./config/env"
 import { getOrCreateKvStore, loadFromKv } from "./lib/kvStore"
@@ -59,8 +58,6 @@ async function runBot(): Promise<void> {
     })
     const kvStore = await getOrCreateKvStore(apifyClient)
 
-    await collectFeedback(kvStore, telegramClient, env.telegramChatId!)
-
     const query = pickRandomQuery()
     console.log(`Query: ${query}`)
 
@@ -76,11 +73,9 @@ async function runBot(): Promise<void> {
     const scoredTweets = await scoreTweetsWithAI(genAI, cleanTweets, masterRules)
     const finalTweets = scoredTweets.slice(0, MAX_TWEETS_FOR_TELEGRAM)
 
-    const sentBatch = await telegramClient.sendFeedbackBatch(finalTweets)
-    const activeBatch = createActiveFeedbackBatch(env.telegramChatId!, finalTweets, sentBatch)
-    await saveActiveFeedbackBatch(kvStore, activeBatch)
+    await telegramClient.sendFeedbackBatch(finalTweets)
 
-    console.log("Feedback batch sent to Telegram successfully.")
+    console.log("Tweet batch sent to Telegram successfully.")
 }
 
 runBot().catch((error) => {
