@@ -2,160 +2,88 @@
 
 ## What this system does
 
-This project runs two jobs:
+This project is an AI-powered tweet filter that sends a curated batch of tech-focused tweets to a Telegram chat. It uses natural language processing to allow the user to refine filtering rules dynamically.
 
-1. `npm run bot`
-   - Finalizes feedback replies for the previous Telegram batch.
-   - Fetches tweets from Apify using one random topic query.
+1. **Hourly Cron Job** (`npm run bot` via GitHub Actions)
+   - Fetches tweets from Apify using random topic queries.
    - Filters out retweets, replies, thread children, and spam.
-   - Uses Gemini to rank relevance based on learned rules.
-   - Sends the top tweets to Telegram as one numbered batch.
-   - Sends two `ForceReply` prompts:
-     - liked tweet numbers
-     - disliked tweet numbers
+   - Uses Gemini to score tweets against "Master Rules" stored in Apify KV.
+   - Sends the top 15 tweets to Telegram as a clean, numbered list.
 
-2. `npm run train`
-   - Reads the feedback history from Apify KV.
-   - Skips training until `MIN_FEEDBACK_THRESHOLD` is reached.
-   - Synthesizes a refined ruleset with Gemini.
-   - Saves the latest rules plus a dated backup.
+2. **Real-time Rule Updates** (`api/webhook.ts` via Serverless/Vercel)
+   - Listens for natural language messages from the user on Telegram.
+   - Uses Gemini to interpret instructions (e.g., "Stop showing me crypto").
+   - Dynamically updates the "Master Rules" in Apify KV.
+   - Automatically backs up old rules before every update.
+   - Confirms the update to the user instantly.
 
 ## High-level architecture
 
-- `src/index.ts` -> bot orchestration
-- `src/train.ts` -> training orchestration
-- `src/config/*` -> env parsing and constants
-- `src/lib/*` -> shared helpers and infrastructure
-- `src/bot/*` -> feedback ingestion and AI scoring
-- `src/train/*` -> master-rule synthesis logic
-- `src/types/domain.ts` -> shared domain types
+- `src/index.ts` -> Bot orchestration (Cron job)
+- `api/webhook.ts` -> Natural language feedback handler (Serverless)
+- `src/config/*` -> Environment parsing and constants
+- `src/lib/*` -> Shared infrastructure (Telegram, KV Store, Tweet helpers)
+- `src/bot/scoring.ts` -> AI-based relevance filtering
+- `src/types/domain.ts` -> Shared domain types
 
 ## System invariants
 
-1. Tweet selection invariant
-   - Only main tweets should be sent: no retweets, replies, or thread children.
+1. **Tweet selection invariant**
+   - Only main tweets: no retweets, replies, or thread children.
 
-2. Feedback persistence invariant
-   - Feedback appends to history and is deduped by update and tweet identity.
+2. **Natural Language Rule Update invariant**
+   - Every rule update must be processed by Gemini to merge new instructions with existing ones.
+   - A backup of the rules must be created in KV store before any overwrite.
 
-3. Batch lifecycle invariant
-   - Only one active feedback batch exists at a time.
-   - A batch is finalized at the start of the next bot run.
+3. **Authorized Access invariant**
+   - The webhook must ignore messages not originating from the configured `TELEGRAM_CHAT_ID`.
 
-4. Offset invariant
-   - Telegram update offset is persisted only after the current batch state has been saved.
-
-5. Entrypoint readability invariant
-   - `src/index.ts` and `src/train.ts` stay thin and orchestration-focused.
+4. **Entrypoint readability invariant**
+   - `src/index.ts` and `api/webhook.ts` stay thin and orchestration-focused.
 
 ## Key helpers
 
 ### `src/lib/tweet.ts`
-- `escapeHtml(text)`
-- `normalizeId(value)`
-- `getTweetAuthor(tweet)`
-- `getTweetText(tweet)`
-- `getTweetId(tweet, fallback?)`
-- `getTweetUrl(tweet, fallbackIndex?)`
-- `isSpam(text)`
-- `isRetweet(tweet)`
-- `isReply(tweet)`
-- `isThreadChild(tweet)`
-- `isMainOrParentTweet(tweet)`
+- `getTweetAuthor(tweet)`, `getTweetText(tweet)`, `getTweetUrl(tweet)`
+- `isSpam(text)`, `isMainOrParentTweet(tweet)`
 
 ### `src/lib/kvStore.ts`
-- `getOrCreateKvStore(apifyClient)`
 - `loadFromKv<T>(kvStore, key, fallback)`
+- `saveTextToKv(kvStore, key, value)`: Used for Master Rules.
 - `saveJsonToKv(kvStore, key, value)`
-- `saveTextToKv(kvStore, key, value)`
 
 ### `src/lib/telegram.ts`
-- `createTelegramClient`
-  - `sendFeedbackBatch`
-  - `getUpdates`
+- `sendMessage(chatId, text, options)`: Send plain or HTML messages.
+- `sendFeedbackBatch(tweets)`: Sends the formatted tweet list.
 
 ### `src/config/env.ts`
-- `getEnv()`
-- `assertBotEnv(env)`
-- `assertTrainingEnv(env)`
-
-### `src/bot/feedback.ts`
-- `collectFeedback`
-- `createActiveFeedbackBatch`
-- `saveActiveFeedbackBatch`
-- `parseNumberList`
-- `isNoneReply`
-- `resolvePromptKind`
-- `finalizeBatchReplies`
-
-### `src/bot/scoring.ts`
-- `scoreTweetsWithAI`
-
-### `src/train/synthesizer.ts`
-- `synthesizeMasterRules`
+- `getEnv()`, `assertBotEnv(env)`
 
 ## Runbook
 
 - Install deps: `npm install`
 - Manual bot run: `npm run bot`
-- Manual training run: `npm run train`
 - Type-check: `npm run typecheck`
+- Webhook deployment: Deploy to Vercel/Cloudflare and set `setWebhook` on Telegram.
 
 ## GitHub Actions
 
-- `.github/workflows/cron.yml` runs `npm run bot`.
-- `.github/workflows/train.yml` runs `npm run train`.
+- `.github/workflows/cron.yml` runs `npm run bot` hourly.
+- (Deprecated) `train.yml` and `src/train.ts` have been removed in favor of real-time updates.
 
 ## Rules for adding/changing code
 
 1. **Always search before writing helper code**
-   - Check existing helpers in `src/lib`, `src/bot`, `src/train`.
-   - If a helper exists, import and use it.
-   - Do not create duplicate logic with different names.
-
 2. **If helper needs extension, extend in one place**
-   - Update the existing helper module.
-   - Keep callers thin and reuse updated helper.
-
 3. **Keep entrypoints simple**
-   - `src/index.ts` and `src/train.ts` should read like a story of steps.
-   - No heavy parsing/formatting/business logic inline in entrypoints.
-
 4. **Preserve behavior unless explicitly requested**
-   - Keep the main-tweet-only filtering behavior.
-   - Keep dedupe + append behavior for feedback persistence.
-
 5. **Type safety first**
-   - Use domain types from `src/types/domain.ts`.
-   - Add/adjust types before adding ad-hoc `any`.
-
-6. **Small focused modules**
-   - New integrations/features should go into dedicated files (`src/bot/*`, `src/lib/*`, etc.) and be wired from entrypoints.
-
-7. **Validation before finishing**
-   - Run `npm run typecheck` for every change.
-   - Run `npm run bot` and/or `npm run train` when relevant.
-
-## Practical extension patterns
-
-- **Add a new filter rule**
-  - Implement in `src/lib/tweet.ts` and integrate inside `filterTweets` in `src/index.ts`.
-
-- **Add a new feedback field**
-  - Update `FeedbackEntry` in `src/types/domain.ts`.
-  - Update ingestion in `src/bot/feedback.ts`.
-
-- **Add a new persistence key**
-  - Add key constant in `src/config/constants.ts`.
-  - Read/write using KV helpers only.
-
-- **Add a new bot feature**
-  - Create a new `src/bot/<feature>.ts` module.
-  - Keep `src/index.ts` as orchestration.
+6. **Context Maintenance**
+   - **IMPORTANT:** Whenever a major architectural shift occurs (like the move from structured feedback to natural language webhooks), **this `context.md` file MUST be updated immediately** to reflect the new reality.
 
 ## Notes for future chat instances
 
 When proposing changes, explicitly state:
 1. Which existing helper(s) are reused.
 2. Which module owns the new logic.
-3. Which invariant(s) are affected and how they are preserved.
+3. Which invariant(s) are affected.
