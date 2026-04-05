@@ -8,23 +8,25 @@ import { createTelegramClient } from "../src/lib/telegram"
 
 // Simple type definitions for the serverless function
 export default async function handler(req: any, res: any) {
+    // Only allow POST from Telegram
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' })
     }
+
+    const update = req.body
+    const message = update?.message
+    const chatId = message?.chat?.id ? String(message.chat.id) : null
 
     try {
         const env = getEnv()
         assertBotEnv(env)
 
-        const update = req.body
-        const message = update?.message
-
         if (!message || !message.text) {
             return res.status(200).json({ status: 'ignored', reason: 'No text message' })
         }
 
-        const chatId = String(message.chat.id)
         if (chatId !== String(env.telegramChatId)) {
+            console.warn(`Unauthorized message from chatId: ${chatId}`)
             return res.status(200).json({ status: 'ignored', reason: 'Unauthorized chat ID' })
         }
 
@@ -34,9 +36,6 @@ export default async function handler(req: any, res: any) {
         })
 
         const text = message.text.trim()
-
-        // Inform user we are processing
-        await telegramClient.sendMessage(chatId, "<i>Processing your instruction...</i>")
 
         const apifyClient = new ApifyClient({ token: env.apifyToken })
         const genAI = new GoogleGenerativeAI(env.geminiApiKey)
@@ -69,7 +68,7 @@ TASK:
         const responseText = result.response.text().trim()
 
         if (responseText === "[NOT A RULE UPDATE]") {
-            await telegramClient.sendMessage(chatId, "I am your tweet filter bot. Send me instructions to update your preferences, e.g., 'Stop showing me crypto tweets'.")
+            await telegramClient.sendMessage(chatId!, "I am your tweet filter bot. Send me instructions to update your preferences, e.g., 'Stop showing me crypto tweets'.")
             return res.status(200).json({ status: 'success', message: 'Not a rule update' })
         }
 
@@ -83,12 +82,31 @@ TASK:
         await saveTextToKv(kvStore, RULES_KEY, responseText)
 
         // Confirm to user
-        await telegramClient.sendMessage(chatId, "<b>Rules updated successfully!</b>\n\nI'll use these new preferences for the next batch of tweets.")
+        await telegramClient.sendMessage(chatId!, "<b>Rules updated successfully!</b>\n\nI'll use these new preferences for the next batch of tweets.")
         
+        // Final success response to Telegram
         return res.status(200).json({ status: 'success', message: 'Rules updated' })
 
     } catch (error: any) {
         console.error("Webhook Error:", error)
-        return res.status(500).json({ error: 'Internal Server Error' })
+        
+        // Attempt to notify user of the error if we have a chatId
+        if (chatId) {
+            try {
+                const env = getEnv()
+                if (env.telegramBotToken) {
+                    const telegramClient = createTelegramClient({
+                        botToken: env.telegramBotToken,
+                        chatId: chatId,
+                    })
+                    await telegramClient.sendMessage(chatId, `⚠️ <b>Error processing rule update</b>\n\nDetails: <i>${error.message || "Unknown error"}</i>\n\nPlease check the Vercel logs for more info.`)
+                }
+            } catch (notifyError) {
+                console.error("Failed to notify user of error:", notifyError)
+            }
+        }
+
+        // CRITICAL: Always return 200 OK to Telegram to prevent infinite retry loops
+        return res.status(200).json({ status: 'error', error: error.message || 'Internal Server Error' })
     }
 }
