@@ -1,4 +1,4 @@
-import { ApifyClient } from "apify-client"
+import { ApifyClient } from "apify-client/browser"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 import { RULES_KEY } from "../src/config/constants"
