@@ -1,10 +1,9 @@
 name: Hourly Tech Tweet Scraper
 on:
     schedule:
-        # Runs at minute 0 past every hour from 8 AM to 7 PM UTC.
-        # Adjust these hours to fit your timezone (IST = UTC + 5:30).
-        # For 1:30 PM to 1:30 AM IST, use: '0 8-19 * * *'
-        - cron: '0 8-19 * * *'
+        # Adjusted to fit indian time (IST = UTC + 5:30).
+         # Format: minute hour day month weekday
+        - cron: '30 4,6,8,10,12,14,16,18 * * *' # This will run at 10AM, 12PM, 2PM, 4PM, 6PM, 8PM, 10PM, and 12AM IST every day.
     workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
 
 concurrency:
