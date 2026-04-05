@@ -13,7 +13,7 @@ export async function scoreTweetsWithAI(
         return tweets
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
 
     const tweetList = tweets
         .map((tweet, index) => `[${index}] @${getTweetAuthor(tweet)}: ${getTweetText(tweet).substring(0, 250)}`)

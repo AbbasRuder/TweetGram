@@ -43,7 +43,7 @@ export default async function handler(req: any, res: any) {
 
         const existingRules = await loadFromKv<string>(kvStore, RULES_KEY, "")
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
 
         const prompt = `You are the brain of a tweet-filtering bot. 
 The user is sending you an instruction to update the filtering rules.
