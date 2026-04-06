@@ -1,6 +1,8 @@
 import { ApifyClient } from "apify-client/browser"
 import OpenAI from "openai"
 
+process.env.APIFY_LOG_LEVEL = 'error';
+
 import { RULES_KEY } from "../src/config/constants"
 import { assertBotEnv, getEnv } from "../src/config/env"
 import { getOrCreateKvStore, loadFromKv, saveTextToKv } from "../src/lib/kvStore"

@@ -1,6 +1,8 @@
 import { ApifyClient } from "apify-client"
 import OpenAI from "openai"
 
+process.env.APIFY_LOG_LEVEL = 'error';
+
 import { MAX_TWEETS_FOR_TELEGRAM, MAX_TWEETS_PER_FETCH, RULES_KEY, TOPIC_QUERIES } from "./config/constants"
 import { assertBotEnv, getEnv } from "./config/env"
 import { getOrCreateKvStore, loadFromKv } from "./lib/kvStore"
@@ -72,46 +74,49 @@ async function runBot(): Promise<void> {
     let accumulatedTweets: TweetRecord[] = []
     const seenIds = new Set<string>()
 
-    const MAX_ITERATIONS = 3
+    // Shuffle and pick unique queries for each iteration
+    const queryPool = [...TOPIC_QUERIES].sort(() => Math.random() - 0.5)
+    const MAX_ITERATIONS = Math.min(3, queryPool.length)
     const TARGET_COUNT = MAX_TWEETS_FOR_TELEGRAM
 
-    for (let i = 1; i <= MAX_ITERATIONS; i++) {
-        console.log(`[Bot] Iteration ${i}/${MAX_ITERATIONS} (Target: ${TARGET_COUNT}, Current: ${accumulatedTweets.length})`)
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+        const iterationNum = i + 1
+        console.log(`[Bot] Iteration ${iterationNum}/${MAX_ITERATIONS} (Target: ${TARGET_COUNT}, Current: ${accumulatedTweets.length})`)
         
-        const query = pickRandomQuery()
+        const query = queryPool[i]
         console.log(`[Scraper] Using query: ${query}`)
 
         let rawTweets: TweetRecord[] = []
         try {
             rawTweets = await fetchTweets(apifyClient, env.actorId, query)
         } catch (error: any) {
-            console.error(`[Scraper Error] Failed to fetch tweets in iteration ${i}:`, error.message)
+            console.error(`[Scraper Error] Failed to fetch tweets in iteration ${iterationNum}:`, error.message)
             continue
         }
 
         const cleanTweets = filterTweets(rawTweets)
         if (cleanTweets.length === 0) {
-            console.log(`[Bot] No valid tweets in iteration ${i} after spam filtering.`)
+            console.log(`[Bot] No valid tweets in iteration ${iterationNum} after filtering.`)
             continue
         }
 
         const scoredTweets = await scoreTweetsWithAI(openai, cleanTweets, masterRules)
         
+        let newCount = 0
         for (const tweet of scoredTweets) {
             const id = String(tweet.id || "")
             if (id && !seenIds.has(id)) {
                 seenIds.add(id)
                 accumulatedTweets.push(tweet)
+                newCount++
             }
         }
+
+        console.log(`[Bot] Iteration ${iterationNum} added ${newCount} new unique tweets.`)
 
         if (accumulatedTweets.length >= TARGET_COUNT) {
             console.log(`[Bot] Reached target of ${TARGET_COUNT} tweets. Stopping search.`)
             break
-        }
-
-        if (i < MAX_ITERATIONS) {
-            console.log(`[Bot] Only ${accumulatedTweets.length} tweets found. Starting next iteration...`)
         }
     }
 
