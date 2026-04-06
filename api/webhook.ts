@@ -42,7 +42,7 @@ export default async function handler(req: any, res: any) {
         const openai = new OpenAI({ 
             apiKey: env.nvidiaApiKey, 
             baseURL: 'https://integrate.api.nvidia.com/v1',
-            timeout: 30000 // 30 second timeout for AI calls
+            timeout: 180000 // 180 second timeout (3 minutes)
         })
         
         console.log(`[Webhook] Connecting to Apify KV Store...`)

@@ -61,7 +61,7 @@ export function createTelegramClient(config: TelegramClientConfig) {
             const author = getTweetAuthor(tweet);
             const text = getTweetText(tweet).replace(/\n/g, ' ');
             const url = getTweetUrl(tweet, index);
-            const shortText = escapeHtml(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            const shortText = escapeHtml(text.substring(0, 280) + (text.length > 280 ? '...' : ''));
             const safeAuthor = escapeHtml(author);
             return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>`;
         });

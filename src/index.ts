@@ -60,39 +60,65 @@ async function runBot(): Promise<void> {
     const openai = new OpenAI({ 
         apiKey: env.nvidiaApiKey, 
         baseURL: 'https://integrate.api.nvidia.com/v1',
-        timeout: 30000 // 30 second timeout for AI calls
+        timeout: 180000 // 180 second timeout (3 minutes)
     })
     const telegramClient = createTelegramClient({
         botToken: env.telegramBotToken!,
         chatId: env.telegramChatId!,
     })
     const kvStore = await getOrCreateKvStore(apifyClient)
-
-    const query = pickRandomQuery()
-    console.log(`[Scraper] Using query: ${query}`)
-
-    let rawTweets: TweetRecord[] = []
-    try {
-        rawTweets = await fetchTweets(apifyClient, env.actorId, query)
-    } catch (error: any) {
-        console.error("[Scraper Error] Failed to fetch tweets from Apify:", error.message)
-        return
-    }
-
-    const cleanTweets = filterTweets(rawTweets)
-    if (cleanTweets.length === 0) {
-        console.log("[Bot] No valid tweets after spam filtering. Exiting.")
-        return
-    }
-
-    console.log(`[Bot] ${cleanTweets.length} tweets ready for scoring.`)
-
     const masterRules = await loadFromKv<string>(kvStore, RULES_KEY, "")
-    const scoredTweets = await scoreTweetsWithAI(openai, cleanTweets, masterRules)
-    const finalTweets = scoredTweets.slice(0, MAX_TWEETS_FOR_TELEGRAM)
+
+    let accumulatedTweets: TweetRecord[] = []
+    const seenIds = new Set<string>()
+
+    const MAX_ITERATIONS = 3
+    const TARGET_COUNT = MAX_TWEETS_FOR_TELEGRAM
+
+    for (let i = 1; i <= MAX_ITERATIONS; i++) {
+        console.log(`[Bot] Iteration ${i}/${MAX_ITERATIONS} (Target: ${TARGET_COUNT}, Current: ${accumulatedTweets.length})`)
+        
+        const query = pickRandomQuery()
+        console.log(`[Scraper] Using query: ${query}`)
+
+        let rawTweets: TweetRecord[] = []
+        try {
+            rawTweets = await fetchTweets(apifyClient, env.actorId, query)
+        } catch (error: any) {
+            console.error(`[Scraper Error] Failed to fetch tweets in iteration ${i}:`, error.message)
+            continue
+        }
+
+        const cleanTweets = filterTweets(rawTweets)
+        if (cleanTweets.length === 0) {
+            console.log(`[Bot] No valid tweets in iteration ${i} after spam filtering.`)
+            continue
+        }
+
+        const scoredTweets = await scoreTweetsWithAI(openai, cleanTweets, masterRules)
+        
+        for (const tweet of scoredTweets) {
+            const id = String(tweet.id || "")
+            if (id && !seenIds.has(id)) {
+                seenIds.add(id)
+                accumulatedTweets.push(tweet)
+            }
+        }
+
+        if (accumulatedTweets.length >= TARGET_COUNT) {
+            console.log(`[Bot] Reached target of ${TARGET_COUNT} tweets. Stopping search.`)
+            break
+        }
+
+        if (i < MAX_ITERATIONS) {
+            console.log(`[Bot] Only ${accumulatedTweets.length} tweets found. Starting next iteration...`)
+        }
+    }
+
+    const finalTweets = accumulatedTweets.slice(0, TARGET_COUNT)
 
     if (finalTweets.length === 0) {
-        console.log("[Bot] No tweets passed the AI scoring threshold. Skipping Telegram update.")
+        console.log("[Bot] No tweets passed the AI scoring threshold after all iterations. Exiting.")
         return
     }
 

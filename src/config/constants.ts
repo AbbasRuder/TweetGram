@@ -5,10 +5,10 @@ export const KV_STORE_NAME = 'twitter-bot-brain-v2-final-debug';
 export const RULES_KEY = 'master-rules';
 
 export const TOPIC_QUERIES = [
-    '(#buildinpublic OR "micro saas" OR "microsaas" OR #indiehackers) min_faves:4 lang:en -crypto -nft -web3 -btc',
-    '("software engineering" OR "web development" OR #100DaysOfCode OR "reactjs" OR "nextjs") min_faves:5 lang:en -crypto -nft',
-    '("AI agents" OR "LLMs" OR OpenAI OR Anthropic OR Cursor OR "generative ai" OR Gemini) min_faves:10 lang:en -crypto -nft',
-    '("saas marketing" OR "b2b saas" OR "indie maker" OR "founder") min_faves:3 lang:en -crypto'
+    '(#buildinpublic OR "micro saas" OR "microsaas" OR #indiehackers OR "just launched" OR "MRR") min_faves:10 -filter:replies lang:en -crypto -nft -web3 -btc',
+    '("software engineering" OR "system design" OR "Next.js" OR "React" OR "Node.js" OR "TypeScript") min_faves:10 -filter:replies lang:en -crypto -nft',
+    '("AI agents" OR "agentic" OR "LLMs" OR "OpenAI" OR "Anthropic" OR "Cursor" OR "RAG" OR "LangChain" OR "CrewAI") min_faves:10 -filter:replies lang:en -crypto -nft',
+    '("b2b saas" OR "saas growth" OR "indie maker" OR "founder lessons" OR "solopreneur" OR "bootstrapped") min_faves:10 -filter:replies lang:en -crypto'
 ] as const;
 
 export const SPAM_KEYWORDS = [

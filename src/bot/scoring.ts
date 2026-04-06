@@ -60,10 +60,10 @@ export async function scoreTweetsWithAI(
             .filter((index) => index >= 0 && index < tweets.length)
             .map((index) => tweets[index])
 
-        console.log(`AI scoring: ${tweets.length} tweets -> ${filtered.length} passed (score >= 6).`)
-        return filtered.length > 0 ? filtered : tweets.slice(0, 5)
+        console.log(`[AI Scoring] Finished. ${filtered.length} tweets passed (score >= 6).`)
+        return filtered
     } catch (error: any) {
-        console.error("AI scoring failed, passing all tweets:", error?.message || error)
-        return tweets
+        console.error(`[AI Scoring Error] ${error.message || error}`)
+        return [] // Return empty list on error to allow the bot to retry with a new query
     }
 }
