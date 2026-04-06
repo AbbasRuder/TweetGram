@@ -15,11 +15,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "apify-client": "^2.22.3",
-    "axios": "^1.13.6",
-    "dotenv": "^17.3.1",
-    "openai": "^6.33.0",
-    "proxy-agent": "^6.5.0"
+    "apify-client": "2.22.3",
+    "axios": "1.13.6",
+    "dotenv": "17.3.1",
+    "openai": "6.33.0",
+    "proxy-agent": "6.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
