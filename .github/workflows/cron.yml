@@ -13,6 +13,7 @@ concurrency:
 jobs:
     scrape-and-send:
         runs-on: ubuntu-latest
+        environment: production
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v4
