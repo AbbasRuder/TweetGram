@@ -16,4 +16,4 @@ The primary source of truth for the project's architecture, helpers, and invaria
 - Use TypeScript with strict mode.
 - Prefer `CommonJS` as configured in `package.json`.
 - Use `tsx` for running scripts locally.
-- Use `Gemini 1.5 Flash` for AI-based filtering and rule updates.
+- Use `OpenAI SDK` with NVIDIA API for AI-based filtering and rule updates.

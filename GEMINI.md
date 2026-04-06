@@ -14,6 +14,6 @@ The `context.md` file in the root directory contains the complete technical over
 4. **Context Maintenance:** If you make a major architectural change or add significant new subsystems, you MUST update the `context.md` file immediately to keep it as the source of truth.
 
 ## Specific AI Rules
-- **Rule Updates:** When using the Gemini API to update rules, always instruct the LLM to *merge* new instructions with existing ones, not overwrite the entire list (unless requested).
+- **Rule Updates:** When using the OpenAI API to update rules, always instruct the LLM to *merge* new instructions with existing ones, not overwrite the entire list (unless requested).
 - **Rule Backup:** Always use the KV store helpers to create a dated backup of the rules before any update operation.
-- **Filtering:** Use `gemini-1.5-flash` for high-speed, cost-efficient filtering and instruction processing.
+- **Filtering:** Use `OpenAI SDK` with NVIDIA NIM models for high-speed, cost-efficient filtering and instruction processing.

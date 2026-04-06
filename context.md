@@ -7,12 +7,12 @@ This project is an AI-powered tweet filter that sends a curated batch of tech-fo
 1. **Hourly Cron Job** (`npm run bot` via GitHub Actions)
    - Fetches tweets from Apify using random topic queries.
    - Filters out retweets, replies, thread children, and spam.
-   - Uses Gemini to score tweets against "Master Rules" stored in Apify KV.
+   - Uses OpenAI (via NVIDIA API) to score tweets against "Master Rules" stored in Apify KV.
    - Sends the top 15 tweets to Telegram as a clean, numbered list.
 
 2. **Real-time Rule Updates** (`api/webhook.ts` via Serverless/Vercel)
    - Listens for natural language messages from the user on Telegram.
-   - Uses Gemini to interpret instructions (e.g., "Stop showing me crypto").
+   - Uses OpenAI (via NVIDIA API) to interpret instructions (e.g., "Stop showing me crypto").
    - Dynamically updates the "Master Rules" in Apify KV.
    - Automatically backs up old rules before every update.
    - Confirms the update to the user instantly.
@@ -32,7 +32,7 @@ This project is an AI-powered tweet filter that sends a curated batch of tech-fo
    - Only main tweets: no retweets, replies, or thread children.
 
 2. **Natural Language Rule Update invariant**
-   - Every rule update must be processed by Gemini to merge new instructions with existing ones.
+   - Every rule update must be processed by the LLM model to merge new instructions with existing ones.
    - A backup of the rules must be created in KV store before any overwrite.
 
 3. **Authorized Access invariant**
@@ -77,7 +77,8 @@ This project is an AI-powered tweet filter that sends a curated batch of tech-fo
 2. **If helper needs extension, extend in one place**
 3. **Keep entrypoints simple**
 4. **Preserve behavior unless explicitly requested**
-5. **Type safety first**
+5. **Type safety first**   
+   - **MANDATORY:** Run `npm run typecheck` after every single code change. A change is not complete until it passes type safety.
 6. **Context Maintenance**
    - **IMPORTANT:** Whenever a major architectural shift occurs (like the move from structured feedback to natural language webhooks), **this `context.md` file MUST be updated immediately** to reflect the new reality.
 

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "npm run bot",
     "bot": "tsx src/index.ts",
+    "test:webhook": "tsx src/test/test-webhook.ts",
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck"
   },
@@ -14,10 +15,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "apify-client": "^2.22.3",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
+    "openai": "^6.33.0",
     "proxy-agent": "^6.5.0"
   },
   "devDependencies": {

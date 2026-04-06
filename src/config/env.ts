@@ -4,7 +4,7 @@ export interface AppEnv {
     apifyToken: string;
     telegramBotToken?: string;
     telegramChatId?: string;
-    geminiApiKey: string;
+    nvidiaApiKey: string;
     actorId: string;
 }
 
@@ -15,13 +15,13 @@ export function getEnv(): AppEnv {
         apifyToken: process.env.APIFY_TOKEN || '',
         telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
         telegramChatId: process.env.TELEGRAM_CHAT_ID,
-        geminiApiKey: process.env.GEMINI_API_KEY || '',
+        nvidiaApiKey: process.env.NVIDIA_API_KEY || '',
         actorId: process.env.APIFY_ACTOR_ID || DEFAULT_ACTOR_ID
     };
 }
 
 export function assertBotEnv(env: AppEnv): void {
-    if (!env.apifyToken || !env.telegramBotToken || !env.telegramChatId || !env.geminiApiKey) {
-        throw new Error('Missing required environment variables. Need: APIFY_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY');
+    if (!env.apifyToken || !env.telegramBotToken || !env.telegramChatId || !env.nvidiaApiKey) {
+        throw new Error('Missing required environment variables. Need: APIFY_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, NVIDIA_API_KEY');
     }
 }

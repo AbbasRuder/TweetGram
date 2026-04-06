@@ -30,8 +30,17 @@ export interface TelegramUpdate {
 
 export function createTelegramClient(config: TelegramClientConfig) {
     const callApi = async <T>(method: string, data: Record<string, unknown>): Promise<T> => {
-        const response = await axios.post(`https://api.telegram.org/bot${config.botToken}/${method}`, data);
-        return response.data?.result as T;
+        try {
+            const response = await axios.post(`https://api.telegram.org/bot${config.botToken}/${method}`, data, {
+                timeout: 10000 // 10 second timeout to prevent hangs
+            });
+            return response.data?.result as T;
+        } catch (error: any) {
+            const status = error.response?.status;
+            const message = error.response?.data?.description || error.message;
+            console.error(`[Telegram API Error] ${method} failed (${status || 'No Status'}): ${message}`);
+            throw error;
+        }
     };
 
     async function sendMessage(chatId: string | number, text: string, options: Record<string, unknown> = {}): Promise<TelegramMessage> {
@@ -52,7 +61,7 @@ export function createTelegramClient(config: TelegramClientConfig) {
             const author = getTweetAuthor(tweet);
             const text = getTweetText(tweet).replace(/\n/g, ' ');
             const url = getTweetUrl(tweet, index);
-            const shortText = escapeHtml(text.substring(0, 150) + (text.length > 150 ? '...' : ''));
+            const shortText = escapeHtml(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
             const safeAuthor = escapeHtml(author);
             return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>`;
         });
