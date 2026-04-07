@@ -57,7 +57,7 @@ export function createTelegramClient(config: TelegramClientConfig) {
             throw new Error('sendFeedbackBatch requires at least one tweet.');
         }
 
-        const lines = tweets.map((tweet, index) => {
+        const formattedLines = tweets.map((tweet, index) => {
             const author = getTweetAuthor(tweet);
             const text = getTweetText(tweet).replace(/\n/g, ' ');
             const url = getTweetUrl(tweet, index);
@@ -66,20 +66,33 @@ export function createTelegramClient(config: TelegramClientConfig) {
             return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>`;
         });
 
-        const header = `<b>New batch of tweets</b>\n<i>${tweets.length} tweets ready:</i>`;
-        const message = [header, ...lines].join('\n\n');
+        const CHUNK_SIZE = 8;
         const sentAt = new Date().toISOString();
+        let firstMessageId: number | undefined;
 
-        const aggregateMessage = await callApi<TelegramMessage>('sendMessage', {
-            chat_id: config.chatId,
-            text: message,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-        });
+        for (let i = 0; i < formattedLines.length; i += CHUNK_SIZE) {
+            const chunk = formattedLines.slice(i, i + CHUNK_SIZE);
+            const isFirst = i === 0;
+            const header = isFirst 
+                ? `<b>New batch of tweets</b>\n<i>${tweets.length} high-quality tweets found:</i>`
+                : `<b>Batch continued...</b>`;
+            
+            const message = [header, ...chunk].join('\n\n');
+
+            const sent = await callApi<TelegramMessage>('sendMessage', {
+                chat_id: config.chatId,
+                text: message,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_markup: { remove_keyboard: true }
+            });
+
+            if (isFirst) firstMessageId = sent.message_id;
+        }
 
         return {
             sentAt,
-            aggregateMessageId: aggregateMessage.message_id,
+            aggregateMessageId: firstMessageId || 0,
         };
     }
 
