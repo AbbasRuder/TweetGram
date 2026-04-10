@@ -3,6 +3,9 @@ export const MAX_TWEETS_FOR_TELEGRAM = 15;
 
 export const KV_STORE_NAME = 'twitter-bot-brain-v2-final-debug';
 export const RULES_KEY = 'master-rules';
+export const TARGET_LIST_ID_KEY = 'target-list-id';
+export const TARGET_LIST_ID = '1977749004088959299';
+export const SEEN_TWEETS_KEY = 'seen-tweet-ids';
 
 export const TOPIC_QUERIES = [
     '(#buildinpublic OR "micro saas" OR "microsaas" OR #indiehackers OR "just launched" OR "MRR") min_faves:10 -filter:replies lang:en -crypto -nft -web3 -btc',

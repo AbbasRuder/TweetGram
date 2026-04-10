@@ -1,63 +1,56 @@
 # Project Context - Twitter to Telegram Bot
 
 ## What this system does
-
-This project is an AI-powered tweet filter that sends a curated batch of tech-focused tweets to a Telegram chat. It uses natural language processing to allow the user to refine filtering rules dynamically.
+This project is an AI-powered tweet filter that sends a curated batch of tech-focused tweets to a Telegram chat. It has transitioned to a cost-effective Twitter List scraping strategy.
 
 1. **Hourly Cron Job** (`npm run bot` via GitHub Actions)
-   - Fetches tweets from Apify using random topic queries.
-   - Filters out retweets, replies, thread children, and spam.
-   - Uses OpenAI (via NVIDIA API) to score tweets against "Master Rules" stored in Apify KV.
-   - Sends the top 15 tweets to Telegram as a clean, numbered list.
+   - Fetches latest tweets from a specific Twitter List ID stored in Apify KV.
+   - Filters out tweets older than 5 hours to ensure high relevance and visibility.
+   - Sorts tweets by `createdAt` descending (latest first).
+   - Implements cross-run deduplication by storing sent tweet IDs in Apify KV.
 
-2. **Real-time Rule Updates** (`api/webhook.ts` via Serverless/Vercel)
+2. **Real-time Updates** (`api/webhook.ts` via Serverless/Vercel)
    - Listens for natural language messages from the user on Telegram.
-   - Uses OpenAI (via NVIDIA API) to interpret instructions (e.g., "Stop showing me crypto").
-   - Dynamically updates the "Master Rules" in Apify KV.
-   - Automatically backs up old rules before every update.
-   - Confirms the update to the user instantly.
+   - Uses OpenAI (NVIDIA DeepSeek) to interpret instructions for rules, target account lists, and the Twitter List ID.
+   - Dynamically updates "Master Rules", "Target Accounts", and "Target List ID" in Apify KV.
+   - Automatically backs up all state before every update.
 
 ## High-level architecture
 
-- `src/index.ts` -> Bot orchestration (Cron job)
-- `api/webhook.ts` -> Natural language feedback handler (Serverless)
+- `src/index.ts` -> Bot orchestration (Entrypoint)
+- `src/bot/accountScraper.ts` -> Active List-based scraping logic (using static List ID)
+- `src/bot/legacyScraper.ts` -> Dormant topic-based scraping logic
+- `api/webhook.ts` -> Natural language config handler (extracts List ID)
 - `src/config/*` -> Environment parsing and constants
 - `src/lib/*` -> Shared infrastructure (Telegram, KV Store, Tweet helpers)
-- `src/bot/scoring.ts` -> AI-based relevance filtering
-- `src/types/domain.ts` -> Shared domain types
 
 ## System invariants
 
 1. **Tweet selection invariant**
    - Only main tweets: no retweets, replies, or thread children.
 
-2. **Natural Language Rule Update invariant**
-   - Every rule update must be processed by the LLM model to merge new instructions with existing ones.
-   - A backup of the rules must be created in KV store before any overwrite.
+2. **Freshness invariant**
+   - Only tweets posted within the last 5 hours are eligible for sending.
 
-3. **Authorized Access invariant**
-   - The webhook must ignore messages not originating from the configured `TELEGRAM_CHAT_ID`.
+3. **Cost Efficiency invariant**
+   - Primary fetching must use the static Twitter List ID strategy to stay within the Apify free tier.
 
-4. **Entrypoint readability invariant**
+4. **Cross-Run Deduplication invariant**
+   - Sent tweet IDs must be persisted in KV store to prevent duplicates across runs.
+
+
+
+5. **Entrypoint readability invariant**
    - `src/index.ts` and `api/webhook.ts` stay thin and orchestration-focused.
 
 ## Key helpers
 
-### `src/lib/tweet.ts`
-- `getTweetAuthor(tweet)`, `getTweetText(tweet)`, `getTweetUrl(tweet)`
-- `isSpam(text)`, `isMainOrParentTweet(tweet)`
+### `src/bot/accountScraper.ts`
+- `runAccountBot(env)`: Orchestrates fetching from a Twitter List, filtering, and deduplication.
 
-### `src/lib/kvStore.ts`
-- `loadFromKv<T>(kvStore, key, fallback)`
-- `saveTextToKv(kvStore, key, value)`: Used for Master Rules.
-- `saveJsonToKv(kvStore, key, value)`
-
-### `src/lib/telegram.ts`
-- `sendMessage(chatId, text, options)`: Send plain or HTML messages.
-- `sendFeedbackBatch(tweets)`: Sends the formatted tweet list.
-
-### `src/config/env.ts`
-- `getEnv()`, `assertBotEnv(env)`
+### `src/config/constants.ts`
+- `TARGET_LIST_ID_KEY`, , `SEEN_TWEETS_KEY`, `RULES_KEY`
+- `MAX_TWEETS_FOR_TELEGRAM`, `MAX_TWEETS_PER_FETCH`
 
 ## Runbook
 

@@ -13,6 +13,7 @@ export interface TweetRecord {
     text?: string;
     full_text?: string;
     url?: string;
+    createdAt?: string;
 
     author?: TweetAuthor;
     user?: TweetUser;

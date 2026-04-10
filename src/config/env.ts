@@ -8,7 +8,7 @@ export interface AppEnv {
     actorId: string;
 }
 
-const DEFAULT_ACTOR_ID = 'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest';
+const DEFAULT_ACTOR_ID = 'xquik/twitter-scraper';
 
 export function getEnv(): AppEnv {
     return {
