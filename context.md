@@ -5,6 +5,8 @@ This project is an AI-powered tweet filter that sends a curated batch of tech-fo
 
 1. **Hourly Cron Job** (`npm run bot` via GitHub Actions)
    - Fetches latest tweets from a specific Twitter List ID stored in Apify KV.
+   - **Fallback Mechanism:** If the list returns fewer than 15 fresh tweets, it automatically runs a search for "build in public" topics to fill the batch.
+   - **Daily Stats Tracking:** Every second run (approx. every 2 hours), it fetches the number of replies sent by the user (`@abbashali01`) today and the current monthly Apify spend in USD.
    - Filters out tweets older than 5 hours to ensure high relevance and visibility.
    - Sorts tweets by `createdAt` descending (latest first).
    - Implements cross-run deduplication by storing sent tweet IDs in Apify KV.
