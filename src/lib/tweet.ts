@@ -31,6 +31,23 @@ export function getTweetUrl(tweet: TweetRecord, fallbackIndex = 0): string {
     return tweet.url || `https://x.com/${author}/status/${tweetId}`;
 }
 
+export function getRelativeTime(createdAt?: string): string {
+    if (!createdAt) return "";
+    const now = Date.now();
+    const created = new Date(createdAt).getTime();
+    if (isNaN(created)) return "";
+    
+    const diffMs = Math.max(0, now - created);
+    const mins = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(mins / 60);
+
+    if (hours > 0) {
+        const remainingMins = mins % 60;
+        return `${hours}h ${remainingMins}m ago`;
+    }
+    return `${mins}m ago`;
+}
+
 export function isSpam(text: string): boolean {
     if (!text) return true;
     const lower = text.toLowerCase();

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 import type { SentFeedbackBatch, TweetRecord } from '../types/domain';
-import { escapeHtml, getTweetAuthor, getTweetText, getTweetUrl } from './tweet';
+import { escapeHtml, getRelativeTime, getTweetAuthor, getTweetText, getTweetUrl } from './tweet';
 
 interface TelegramClientConfig {
     botToken: string;
@@ -63,7 +63,9 @@ export function createTelegramClient(config: TelegramClientConfig) {
             const url = getTweetUrl(tweet, index);
             const shortText = escapeHtml(text.substring(0, 280) + (text.length > 280 ? '...' : ''));
             const safeAuthor = escapeHtml(author);
-            return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>`;
+            const relativeTime = getRelativeTime(tweet.createdAt);
+            const timeLabel = relativeTime ? ` • <i>${relativeTime}</i>` : "";
+            return `${index + 1}. <b>@${safeAuthor}</b> - <i>${shortText}</i>\n<a href="${url}">Open in X</a>${timeLabel}`;
         });
 
         const CHUNK_SIZE = 8;
