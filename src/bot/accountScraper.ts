@@ -7,6 +7,7 @@ import type { TweetRecord } from "../types/domain"
 import type { AppEnv } from "../config/env"
 
 const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+const MIN_TWEETS_TO_PROCEED = 5;
 
 async function fetchTweetsFromList(apifyClient: ApifyClient, actorId: string, listId: string): Promise<TweetRecord[]> {
     console.log(`[List Scraper] Fetching from Twitter List: ${listId} using ${actorId}`);
@@ -70,7 +71,7 @@ async function fetchDailyStats(apifyClient: ApifyClient, actorId: string, handle
     let totalUsd = 0;
     try {
         const usage: any = await apifyClient.user().monthlyUsage();
-        totalUsd = usage.totalUsd || 0;
+        totalUsd = usage.totalUsageCreditsUsdAfterVolumeDiscount || usage.totalUsageCreditsUsdBeforeVolumeDiscount || 0;
     } catch (error: any) {
         console.error(`[Stats] Failed to fetch Apify usage: ${error.message}`);
     }
@@ -116,24 +117,36 @@ export async function runAccountBot(env: AppEnv): Promise<void> {
     const seenSet = new Set(seenIds);
     const now = Date.now();
 
-    // Track bot run count for stats frequency
-    const runCount = await loadFromKv<number>(kvStore, RUN_COUNT_KEY, 0);
-    const currentRun = runCount + 1;
-    const shouldTrackStats = currentRun % 2 === 0;
-
     // 1. Fetch from static list
     const rawListTweets = await fetchTweetsFromList(apifyClient, env.actorId, listId);
     let filteredTweets = processAndFilterTweets(rawListTweets, seenSet, now);
     console.log(`[Bot] Found ${filteredTweets.length} fresh tweets from list.`);
 
-    // 2. Fallback to community search if needed
+    // ABORT logic: if list has < 5 fresh tweets, we stop tweet processing but still handle stats
+    if (filteredTweets.length < MIN_TWEETS_TO_PROCEED) {
+        console.log(`[Bot] Only ${filteredTweets.length} fresh tweets found from list (minimum required: ${MIN_TWEETS_TO_PROCEED}). Skipping tweet batch.`);
+        
+        // Track bot run count for stats frequency
+        const runCount = await loadFromKv<number>(kvStore, RUN_COUNT_KEY, 0);
+        const currentRun = runCount + 1;
+        const shouldTrackStats = currentRun % 2 === 0;
+
+        if (shouldTrackStats) {
+            const stats = await fetchDailyStats(apifyClient, env.actorId, USER_HANDLE);
+            const statsMessage = `📊 <b>Daily Stats:</b>\n\n✅ You have sent ${stats.replyCount >= 50 ? '50+' : stats.replyCount} replies today!\n💸 Current Apify Spend: $${stats.totalUsd.toFixed(2)}\n\n<i>(Tweet batch skipped: only ${filteredTweets.length} fresh posts found)</i>`;
+            await telegramClient.sendMessage(env.telegramChatId!, statsMessage);
+        }
+        
+        await saveJsonToKv(kvStore, RUN_COUNT_KEY, currentRun);
+        return;
+    }
+
+    // 2. Fallback to community search if needed (only if we have >= 5 from list but < 15 total)
     if (filteredTweets.length < MAX_TWEETS_FOR_TELEGRAM) {
         const needed = MAX_TWEETS_FOR_TELEGRAM - filteredTweets.length;
-        console.log(`[Bot] Need ${needed} more tweets. Running fallback search...`);
+        console.log(`[Bot] Need ${needed} more tweets to reach target of ${MAX_TWEETS_FOR_TELEGRAM}. Running fallback search...`);
         
         const rawSearchTweets = await fetchTweetsFromSearch(apifyClient, env.actorId, FALLBACK_COMMUNITY_QUERY);
-        
-        // Add current list IDs to seenSet temporarily to avoid duplicates in the same batch
         const currentBatchIds = new Set(filteredTweets.map(t => String(t.id || t.tweetId || "")));
         const combinedSeenSet = new Set([...seenSet, ...currentBatchIds]);
 
@@ -145,35 +158,33 @@ export async function runAccountBot(env: AppEnv): Promise<void> {
 
     const finalTweets = filteredTweets.slice(0, MAX_TWEETS_FOR_TELEGRAM);
 
+    // Track bot run count for stats frequency
+    const runCount = await loadFromKv<number>(kvStore, RUN_COUNT_KEY, 0);
+    const currentRun = runCount + 1;
+    const shouldTrackStats = currentRun % 2 === 0;
+
     // 3. Optional Stats Tracking
     let statsMessage = "";
     if (shouldTrackStats) {
         const stats = await fetchDailyStats(apifyClient, env.actorId, USER_HANDLE);
-        statsMessage = `📊 <b>Daily Stats:</b>\n- You have sent ${stats.replyCount >= 50 ? '50+' : stats.replyCount} replies today!\n- Current Apify Spend: $${stats.totalUsd.toFixed(2)}`;
+        statsMessage = `📊 <b>Daily Stats:</b>\n\n✅ You have sent ${stats.replyCount >= 50 ? '50+' : stats.replyCount} replies today!\n💸 Current Apify Spend: $${stats.totalUsd.toFixed(2)}`;
     }
 
-    if (finalTweets.length === 0) {
-        console.log("[Bot] No new tweets found from any source.");
+    // 4. Send Tweets to Telegram
+    try {
+        await telegramClient.sendFeedbackBatch(finalTweets);
+        console.log(`[Bot] Successfully sent ${finalTweets.length} tweets to Telegram.`);
+
         if (statsMessage) {
             await telegramClient.sendMessage(env.telegramChatId!, statsMessage);
         }
-    } else {
-        // 4. Send Tweets to Telegram
-        try {
-            await telegramClient.sendFeedbackBatch(finalTweets);
-            console.log(`[Bot] Successfully sent ${finalTweets.length} tweets to Telegram.`);
 
-            if (statsMessage) {
-                await telegramClient.sendMessage(env.telegramChatId!, statsMessage);
-            }
-
-            // 5. Update Seen IDs
-            const newIds = finalTweets.map(t => String(t.id || t.tweetId || ""));
-            const updatedSeenIds = [...newIds, ...seenIds].slice(0, 1000);
-            await saveJsonToKv(kvStore, SEEN_TWEETS_KEY, updatedSeenIds);
-        } catch (error: any) {
-            console.error("[Telegram Error] Failed to send tweet batch:", error.message);
-        }
+        // 5. Update Seen IDs
+        const newIds = finalTweets.map(t => String(t.id || t.tweetId || ""));
+        const updatedSeenIds = [...newIds, ...seenIds].slice(0, 1000);
+        await saveJsonToKv(kvStore, SEEN_TWEETS_KEY, updatedSeenIds);
+    } catch (error: any) {
+        console.error("[Telegram Error] Failed to send tweet batch:", error.message);
     }
 
     // Update run count
